@@ -50,11 +50,14 @@ export default function GameRoom() {
   /* ---------- INIT ---------- */
 
   useEffect(() => {
-    let pid = localStorage.getItem("playerId");
-    if (!pid) {
-      pid = crypto.randomUUID();
-      localStorage.setItem("playerId", pid);
-    }
+let pid = localStorage.getItem("playerId");
+if (!pid) {
+  pid =
+    Date.now().toString(36) +
+    Math.random().toString(36).substring(2, 10);
+  localStorage.setItem("playerId", pid);
+}
+
     setPlayerId(pid);
 
     const init = async () => {
