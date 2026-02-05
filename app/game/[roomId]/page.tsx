@@ -228,7 +228,13 @@ export default function GameRoom() {
 
               <button
                 className="primary-btn floating"
-                onClick={() => setSaidYes(true)}
+                  onClick={() => {
+                  // 📳 Phone vibration (sweet pulse)
+                  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                  navigator.vibrate([100, 50, 100]);
+                 }
+                 setSaidYes(true);
+               }}
               >
                 YES 💕
               </button>
