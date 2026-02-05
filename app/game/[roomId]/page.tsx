@@ -20,19 +20,18 @@ const QUESTIONS = [
   { q: "Cats or Dogs?", o: ["🐱 Cats", "🐶 Dogs"] },
   { q: "Coffee or Tea?", o: ["☕ Coffee", "🍵 Tea"] },
   { q: "Morning or Night?", o: ["🌞 Morning", "🌙 Night"] },
-  { q: "Sweet or Savory?", o: ["🍭 Sweet", "🧂 Savory"] },
+  { q: "Pasta, Burger or Me? 😏", o: ["🍝 Pasta", "🍔 Burger", "😌 You"] },
   { q: "Texting or Calling?", o: ["💬 Texting", "📞 Calling"] },
+  { q: "Phone, Sleep or Me? 🙃", o: ["📱 Phone", "😴 Sleep", "💖 You"] },
+  { q: "Netflix, Food or Me? 😌", o: ["📺 Netflix", "🍟 Food", "💘 You"] },
   { q: "Sunrise or Sunset?", o: ["🌅 Sunrise", "🌇 Sunset"] },
   { q: "Plan or Spontaneous?", o: ["📋 Plan", "✨ Spontaneous"] },
-  { q: "Books or Podcasts?", o: ["📚 Books", "🎧 Podcasts"] },
-  { q: "Home date or Out date?", o: ["🏠 Home", "🌃 Out"] },
   { q: "Ice cream or Cake?", o: ["🍦 Ice Cream", "🍰 Cake"] },
   { q: "Rain or Sunshine?", o: ["🌧 Rain", "☀ Sunshine"] },
   { q: "Surprises or Routine?", o: ["🎁 Surprises", "🔁 Routine"] },
 ];
 
-const MINI_GAMES = ["same", "tap", "slider"];
-const TOTAL_STEPS = QUESTIONS.length + MINI_GAMES.length + 1;
+const TOTAL_STEPS = QUESTIONS.length + 3 + 1; // questions + 3 mini-games + final
 
 /* ===================== GAME ===================== */
 
@@ -44,20 +43,20 @@ export default function GameRoom() {
   const [loading, setLoading] = useState(true);
   const [tapCount, setTapCount] = useState(0);
   const [noPos, setNoPos] = useState({ x: 0, y: 0 });
+  const [saidYes, setSaidYes] = useState(false);
 
   const roomRef = doc(db, "rooms", roomId);
 
   /* ---------- INIT ---------- */
 
   useEffect(() => {
-let pid = localStorage.getItem("playerId");
-if (!pid) {
-  pid =
-    Date.now().toString(36) +
-    Math.random().toString(36).substring(2, 10);
-  localStorage.setItem("playerId", pid);
-}
-
+    let pid = localStorage.getItem("playerId");
+    if (!pid) {
+      pid =
+        Date.now().toString(36) +
+        Math.random().toString(36).substring(2, 10);
+      localStorage.setItem("playerId", pid);
+    }
     setPlayerId(pid);
 
     const init = async () => {
@@ -114,7 +113,9 @@ if (!pid) {
 
   return (
     <main className="screen">
-      <button className="skip-btn" onClick={skip}>Skip ⏭</button>
+      <button className="skip-btn" onClick={skip}>
+        Skip ⏭
+      </button>
 
       {/* QUESTIONS */}
       {room.step < QUESTIONS.length && (
@@ -124,7 +125,9 @@ if (!pid) {
           {QUESTIONS[room.step].o.map((opt) => (
             <button
               key={opt}
-              className={`option-btn ${answers[playerId] === opt ? "selected" : ""}`}
+              className={`option-btn ${
+                answers[playerId] === opt ? "selected" : ""
+              }`}
               onClick={() =>
                 !answered &&
                 updateDoc(roomRef, { [`answers.${playerId}`]: opt })
@@ -134,12 +137,19 @@ if (!pid) {
             </button>
           ))}
 
-          {!allAnswered && <p className="waiting">Waiting for other player…</p>}
-          {allAnswered && <button className="primary-btn" onClick={next}>Next ▶️</button>}
+          {!allAnswered && (
+            <p className="waiting">Waiting for other player…</p>
+          )}
+
+          {allAnswered && (
+            <button className="primary-btn" onClick={next}>
+              Next ▶️
+            </button>
+          )}
         </div>
       )}
 
-      {/* MINI GAME 1: SAME CHOICE */}
+      {/* MINI GAME 1 */}
       {room.step === QUESTIONS.length && (
         <div className="card column">
           <h2>Pick the same side 💕</h2>
@@ -155,28 +165,38 @@ if (!pid) {
               {o}
             </button>
           ))}
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+          {allAnswered && (
+            <button className="primary-btn" onClick={next}>
+              Continue ▶️
+            </button>
+          )}
         </div>
       )}
 
-      {/* MINI GAME 2: TAP */}
+      {/* MINI GAME 2 */}
       {room.step === QUESTIONS.length + 1 && (
         <div className="card column">
-          <h2>Tap as much as you want in 5 seconds!</h2>
+          <h2>Tap as much as you want 💥</h2>
           <button
             className="primary-btn"
             onClick={() => {
               setTapCount(tapCount + 1);
-              updateDoc(roomRef, { [`answers.${playerId}`]: tapCount + 1 });
+              updateDoc(roomRef, {
+                [`answers.${playerId}`]: tapCount + 1,
+              });
             }}
           >
-            TAP 💥
+            TAP
           </button>
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+          {allAnswered && (
+            <button className="primary-btn" onClick={next}>
+              Continue ▶️
+            </button>
+          )}
         </div>
       )}
 
-      {/* MINI GAME 3: SLIDER */}
+      {/* MINI GAME 3 */}
       {room.step === QUESTIONS.length + 2 && (
         <div className="card column">
           <h2>How much do you like surprises?</h2>
@@ -185,42 +205,59 @@ if (!pid) {
             min="0"
             max="100"
             onChange={(e) =>
-              updateDoc(roomRef, { [`answers.${playerId}`]: e.target.value })
+              updateDoc(roomRef, {
+                [`answers.${playerId}`]: e.target.value,
+              })
             }
           />
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+          {allAnswered && (
+            <button className="primary-btn" onClick={next}>
+              Continue ▶️
+            </button>
+          )}
         </div>
       )}
 
-      {/* FINAL VALENTINE */}
+      {/* FINAL */}
       {room.step === TOTAL_STEPS - 1 && (
         <div className="card column">
-          <h2>One last question…</h2>
-          <h1>Will you be my Valentine? 💖</h1>
+          {!saidYes ? (
+            <>
+              <h2>One last question…</h2>
+              <h1>Will you be my Valentine? 💖</h1>
 
-          <button className="primary-btn floating">
-            YES 💕
-          </button>
+              <button
+                className="primary-btn floating"
+                onClick={() => setSaidYes(true)}
+              >
+                YES 💕
+              </button>
 
-          <button
-            style={{
-              transform: `translate(${noPos.x}px, ${noPos.y}px)`,
-              background: "#eee",
-            }}
-            onMouseEnter={() =>
-              setNoPos({
-                x: Math.random() * 120 - 60,
-                y: Math.random() * 120 - 60,
-              })
-            }
-          >
-            NO 🙃
-          </button>
-
-          <p className="floating">
-            I knew you’d say yes 💖  
-            Thank you for being my favourite person.
-          </p>
+              <button
+                style={{
+                  transform: `translate(${noPos.x}px, ${noPos.y}px)`,
+                  background: "#eee",
+                }}
+                onMouseEnter={() =>
+                  setNoPos({
+                    x: Math.random() * 120 - 60,
+                    y: Math.random() * 120 - 60,
+                  })
+                }
+              >
+                NO 🙃
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="floating">💖 I knew you’d say yes 💖</h1>
+              <p className="floating">
+                Thank you for being my favourite person,
+                <br />
+                my happiest place, and my forever Valentine.
+              </p>
+            </>
+          )}
         </div>
       )}
     </main>
