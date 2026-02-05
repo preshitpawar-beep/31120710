@@ -2,18 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "@/firebase/firebase";
 
 /**
- * Room document shape (important – do not change later)
+ * Room document shape (LOCKED)
  *
  * {
  *   step: number,
- *   players: number,
+ *   players: {
+ *     [playerId]: true
+ *   },
  *   answers: {},
  *   skip: boolean,
- *   createdAt: timestamp
+ *   createdAt: number
  * }
  */
 
@@ -27,37 +35,45 @@ export default function GameRoom() {
   useEffect(() => {
     if (!roomId) return;
 
+    // Persistent player ID (refresh-safe)
+    let playerId = localStorage.getItem("playerId");
+    if (!playerId) {
+      playerId = crypto.randomUUID();
+      localStorage.setItem("playerId", playerId);
+    }
+
     const roomRef = doc(db, "rooms", roomId);
 
-    // Create room if it doesn't exist
-    setDoc(
-      roomRef,
-      {
-        step: 0,
-        players: 0,
-        answers: {},
-        skip: false,
-        createdAt: Date.now(),
-      },
-      { merge: true }
-    );
+    const initRoom = async () => {
+      const snap = await getDoc(roomRef);
 
-    // Subscribe to real-time updates
+      if (!snap.exists()) {
+        await setDoc(roomRef, {
+          step: 0,
+          players: { [playerId!]: true },
+          answers: {},
+          skip: false,
+          createdAt: Date.now(),
+        });
+      } else {
+        const data = snap.data();
+        if (!data.players?.[playerId!]) {
+          await updateDoc(roomRef, {
+            [`players.${playerId}`]: true,
+          });
+        }
+      }
+    };
+
+    initRoom();
+
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (!snapshot.exists()) return;
-
-      const data = snapshot.data();
-      setRoom(data);
+      setRoom(snapshot.data());
       setLoading(false);
     });
 
-    // Increment player count ONCE per session
-    updateDoc(roomRef, {
-      players: (room?.players || 0) + 1,
-    });
-
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   if (loading || !room) {
@@ -71,6 +87,10 @@ export default function GameRoom() {
     );
   }
 
+  const playerCount = room.players
+    ? Object.keys(room.players).length
+    : 0;
+
   return (
     <main className="screen">
       <div className="card column">
@@ -83,7 +103,7 @@ export default function GameRoom() {
         </p>
 
         <p>
-          Players connected: <strong>{room.players}</strong>
+          Players connected: <strong>{playerCount}</strong>
         </p>
 
         <p style={{ opacity: 0.7 }}>
