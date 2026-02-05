@@ -11,85 +11,73 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase/firebase";
 
-/* ================= QUESTIONS (15 TOTAL) ================= */
+/* ===================== QUESTIONS ===================== */
 
 const QUESTIONS = [
-  { text: "Pizza or Burger?", options: ["🍕 Pizza", "🍔 Burger"], reaction: "Yum 😋 solid choice!" },
-  { text: "Beach or Mountains?", options: ["🏖 Beach", "⛰ Mountains"], reaction: "That says a lot about you 😌" },
-  { text: "Movies or Games?", options: ["🎬 Movies", "🎮 Games"], reaction: "Entertainment vibes 🎉" },
-  { text: "Cats or Dogs?", options: ["🐱 Cats", "🐶 Dogs"], reaction: "Classic debate 😄" },
-  { text: "Coffee or Tea?", options: ["☕ Coffee", "🍵 Tea"], reaction: "Energy choice unlocked ⚡" },
-  { text: "Morning or Night?", options: ["🌞 Morning", "🌙 Night"], reaction: "Your rhythm is showing 🎶" },
-  { text: "Sweet or Savory?", options: ["🍭 Sweet", "🧂 Savory"], reaction: "Snack personality revealed 👀" },
-  { text: "Texting or Calling?", options: ["💬 Texting", "📞 Calling"], reaction: "Communication style unlocked 🔓" },
-  { text: "Sunrise or Sunset?", options: ["🌅 Sunrise", "🌇 Sunset"], reaction: "Beautiful choice 🌈" },
-  { text: "Plan or Spontaneous?", options: ["📋 Plan", "✨ Spontaneous"], reaction: "Life approach confirmed 😄" },
-  { text: "Books or Podcasts?", options: ["📚 Books", "🎧 Podcasts"], reaction: "Learning vibes 📖" },
-  { text: "Home date or Out date?", options: ["🏠 Home", "🌃 Out"], reaction: "Date night energy 💕" },
-  { text: "Ice cream or Cake?", options: ["🍦 Ice Cream", "🍰 Cake"], reaction: "Dessert decisions 😍" },
-  { text: "Rain or Sunshine?", options: ["🌧 Rain", "☀ Sunshine"], reaction: "Mood detected 🌦" },
-  { text: "Surprises or Routine?", options: ["🎁 Surprises", "🔁 Routine"], reaction: "That’s very you 💫" },
+  { q: "Pizza or Burger?", o: ["🍕 Pizza", "🍔 Burger"] },
+  { q: "Beach or Mountains?", o: ["🏖 Beach", "⛰ Mountains"] },
+  { q: "Movies or Games?", o: ["🎬 Movies", "🎮 Games"] },
+  { q: "Cats or Dogs?", o: ["🐱 Cats", "🐶 Dogs"] },
+  { q: "Coffee or Tea?", o: ["☕ Coffee", "🍵 Tea"] },
+  { q: "Morning or Night?", o: ["🌞 Morning", "🌙 Night"] },
+  { q: "Sweet or Savory?", o: ["🍭 Sweet", "🧂 Savory"] },
+  { q: "Texting or Calling?", o: ["💬 Texting", "📞 Calling"] },
+  { q: "Sunrise or Sunset?", o: ["🌅 Sunrise", "🌇 Sunset"] },
+  { q: "Plan or Spontaneous?", o: ["📋 Plan", "✨ Spontaneous"] },
+  { q: "Books or Podcasts?", o: ["📚 Books", "🎧 Podcasts"] },
+  { q: "Home date or Out date?", o: ["🏠 Home", "🌃 Out"] },
+  { q: "Ice cream or Cake?", o: ["🍦 Ice Cream", "🍰 Cake"] },
+  { q: "Rain or Sunshine?", o: ["🌧 Rain", "☀ Sunshine"] },
+  { q: "Surprises or Routine?", o: ["🎁 Surprises", "🔁 Routine"] },
 ];
 
-/* ================= ROOM SHAPE (LOCKED) =================
-{
-  step: number,
-  players: { [playerId]: true },
-  answers: { [playerId]: string },
-  skip: boolean,
-  createdAt: number
-}
-======================================================== */
+const MINI_GAMES = ["same", "tap", "slider"];
+const TOTAL_STEPS = QUESTIONS.length + MINI_GAMES.length + 1;
+
+/* ===================== GAME ===================== */
 
 export default function GameRoom() {
-  const params = useParams();
-  const roomId = params.roomId as string;
+  const { roomId } = useParams() as { roomId: string };
 
   const [room, setRoom] = useState<any>(null);
+  const [playerId, setPlayerId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [playerId, setPlayerId] = useState<string>("");
+  const [tapCount, setTapCount] = useState(0);
+  const [noPos, setNoPos] = useState({ x: 0, y: 0 });
 
-  /* ---------- INIT PLAYER & ROOM ---------- */
+  const roomRef = doc(db, "rooms", roomId);
+
+  /* ---------- INIT ---------- */
 
   useEffect(() => {
-    if (!roomId) return;
-
-    let storedId = localStorage.getItem("playerId");
-    if (!storedId) {
-      storedId = crypto.randomUUID();
-      localStorage.setItem("playerId", storedId);
+    let pid = localStorage.getItem("playerId");
+    if (!pid) {
+      pid = crypto.randomUUID();
+      localStorage.setItem("playerId", pid);
     }
-    setPlayerId(storedId);
+    setPlayerId(pid);
 
-    const roomRef = doc(db, "rooms", roomId);
-
-    const initRoom = async () => {
+    const init = async () => {
       const snap = await getDoc(roomRef);
-
       if (!snap.exists()) {
         await setDoc(roomRef, {
           step: 0,
-          players: { [storedId!]: true },
+          players: { [pid]: true },
           answers: {},
           skip: false,
           createdAt: Date.now(),
         });
-      } else if (!snap.data().players?.[storedId!]) {
-        await updateDoc(roomRef, {
-          [`players.${storedId}`]: true,
-        });
+      } else if (!snap.data().players?.[pid]) {
+        await updateDoc(roomRef, { [`players.${pid}`]: true });
       }
     };
 
-    initRoom();
+    init();
 
-    const unsub = onSnapshot(roomRef, (snap) => {
-      if (!snap.exists()) return;
-      setRoom(snap.data());
+    return onSnapshot(roomRef, (s) => {
+      setRoom(s.data());
       setLoading(false);
     });
-
-    return () => unsub();
   }, [roomId]);
 
   if (loading || !room) {
@@ -97,28 +85,17 @@ export default function GameRoom() {
       <main className="screen">
         <div className="card">
           <h2>Joining room…</h2>
-          <p>Please wait 💕</p>
         </div>
       </main>
     );
   }
 
-  const roomRef = doc(db, "rooms", roomId);
-  const question = QUESTIONS[room.step];
-  const playersCount = Object.keys(room.players || {}).length;
-  const answersCount = Object.keys(room.answers || {}).length;
-  const hasAnswered = !!room.answers?.[playerId];
+  const players = Object.keys(room.players || {});
+  const answers = room.answers || {};
+  const answered = !!answers[playerId];
+  const allAnswered = Object.keys(answers).length === players.length;
 
-  /* ---------- ACTIONS ---------- */
-
-  const selectAnswer = async (opt: string) => {
-    if (hasAnswered) return;
-    await updateDoc(roomRef, {
-      [`answers.${playerId}`]: opt,
-    });
-  };
-
-  const goNext = async () => {
+  const next = async () => {
     await updateDoc(roomRef, {
       step: room.step + 1,
       answers: {},
@@ -126,51 +103,123 @@ export default function GameRoom() {
     });
   };
 
-  /* ---------- QUESTION SCREEN ---------- */
+  const skip = async () => {
+    await next();
+  };
 
-  if (question) {
-    return (
-      <main className="screen">
+  /* ===================== UI ===================== */
+
+  return (
+    <main className="screen">
+      <button className="skip-btn" onClick={skip}>Skip ⏭</button>
+
+      {/* QUESTIONS */}
+      {room.step < QUESTIONS.length && (
         <div className="card column">
-          <h2>{question.text}</h2>
+          <h2>{QUESTIONS[room.step].q}</h2>
 
-          {question.options.map((opt) => (
+          {QUESTIONS[room.step].o.map((opt) => (
             <button
               key={opt}
-              className={`option-btn ${
-                room.answers?.[playerId] === opt ? "selected" : ""
-              }`}
-              onClick={() => selectAnswer(opt)}
+              className={`option-btn ${answers[playerId] === opt ? "selected" : ""}`}
+              onClick={() =>
+                !answered &&
+                updateDoc(roomRef, { [`answers.${playerId}`]: opt })
+              }
             >
               {opt}
             </button>
           ))}
 
-          {answersCount < playersCount && (
-            <div className="waiting">Waiting for other player…</div>
-          )}
-
-          {answersCount === playersCount && (
-            <>
-              <p className="floating">{question.reaction}</p>
-              <button className="primary-btn" onClick={goNext}>
-                Next ▶️
-              </button>
-            </>
-          )}
+          {!allAnswered && <p className="waiting">Waiting for other player…</p>}
+          {allAnswered && <button className="primary-btn" onClick={next}>Next ▶️</button>}
         </div>
-      </main>
-    );
-  }
+      )}
 
-  /* ---------- PLACEHOLDER FOR MINI-GAMES ---------- */
+      {/* MINI GAME 1: SAME CHOICE */}
+      {room.step === QUESTIONS.length && (
+        <div className="card column">
+          <h2>Pick the same side 💕</h2>
+          {["⬅ LEFT", "RIGHT ➡"].map((o) => (
+            <button
+              key={o}
+              className="option-btn"
+              onClick={() =>
+                !answered &&
+                updateDoc(roomRef, { [`answers.${playerId}`]: o })
+              }
+            >
+              {o}
+            </button>
+          ))}
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+        </div>
+      )}
 
-  return (
-    <main className="screen">
-      <div className="card">
-        <h1>Mini-games coming up 🎮</h1>
-        <p>Get ready for something fun 💖</p>
-      </div>
+      {/* MINI GAME 2: TAP */}
+      {room.step === QUESTIONS.length + 1 && (
+        <div className="card column">
+          <h2>Tap as much as you want in 5 seconds!</h2>
+          <button
+            className="primary-btn"
+            onClick={() => {
+              setTapCount(tapCount + 1);
+              updateDoc(roomRef, { [`answers.${playerId}`]: tapCount + 1 });
+            }}
+          >
+            TAP 💥
+          </button>
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+        </div>
+      )}
+
+      {/* MINI GAME 3: SLIDER */}
+      {room.step === QUESTIONS.length + 2 && (
+        <div className="card column">
+          <h2>How much do you like surprises?</h2>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            onChange={(e) =>
+              updateDoc(roomRef, { [`answers.${playerId}`]: e.target.value })
+            }
+          />
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
+        </div>
+      )}
+
+      {/* FINAL VALENTINE */}
+      {room.step === TOTAL_STEPS - 1 && (
+        <div className="card column">
+          <h2>One last question…</h2>
+          <h1>Will you be my Valentine? 💖</h1>
+
+          <button className="primary-btn floating">
+            YES 💕
+          </button>
+
+          <button
+            style={{
+              transform: `translate(${noPos.x}px, ${noPos.y}px)`,
+              background: "#eee",
+            }}
+            onMouseEnter={() =>
+              setNoPos({
+                x: Math.random() * 120 - 60,
+                y: Math.random() * 120 - 60,
+              })
+            }
+          >
+            NO 🙃
+          </button>
+
+          <p className="floating">
+            I knew you’d say yes 💖  
+            Thank you for being my favourite person.
+          </p>
+        </div>
+      )}
     </main>
   );
 }
