@@ -11,28 +11,27 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase/firebase";
 
-/* ------------------ QUESTIONS (LOCKED ORDER) ------------------ */
+/* ================= QUESTIONS (15 TOTAL) ================= */
 
 const QUESTIONS = [
-  {
-    id: 0,
-    text: "Pizza or Burger?",
-    options: ["🍕 Pizza", "🍔 Burger"],
-  },
-  {
-    id: 1,
-    text: "Beach or Mountains?",
-    options: ["🏖 Beach", "⛰ Mountains"],
-  },
-  {
-    id: 2,
-    text: "Movies or Games?",
-    options: ["🎬 Movies", "🎮 Games"],
-  },
+  { text: "Pizza or Burger?", options: ["🍕 Pizza", "🍔 Burger"], reaction: "Yum 😋 solid choice!" },
+  { text: "Beach or Mountains?", options: ["🏖 Beach", "⛰ Mountains"], reaction: "That says a lot about you 😌" },
+  { text: "Movies or Games?", options: ["🎬 Movies", "🎮 Games"], reaction: "Entertainment vibes 🎉" },
+  { text: "Cats or Dogs?", options: ["🐱 Cats", "🐶 Dogs"], reaction: "Classic debate 😄" },
+  { text: "Coffee or Tea?", options: ["☕ Coffee", "🍵 Tea"], reaction: "Energy choice unlocked ⚡" },
+  { text: "Morning or Night?", options: ["🌞 Morning", "🌙 Night"], reaction: "Your rhythm is showing 🎶" },
+  { text: "Sweet or Savory?", options: ["🍭 Sweet", "🧂 Savory"], reaction: "Snack personality revealed 👀" },
+  { text: "Texting or Calling?", options: ["💬 Texting", "📞 Calling"], reaction: "Communication style unlocked 🔓" },
+  { text: "Sunrise or Sunset?", options: ["🌅 Sunrise", "🌇 Sunset"], reaction: "Beautiful choice 🌈" },
+  { text: "Plan or Spontaneous?", options: ["📋 Plan", "✨ Spontaneous"], reaction: "Life approach confirmed 😄" },
+  { text: "Books or Podcasts?", options: ["📚 Books", "🎧 Podcasts"], reaction: "Learning vibes 📖" },
+  { text: "Home date or Out date?", options: ["🏠 Home", "🌃 Out"], reaction: "Date night energy 💕" },
+  { text: "Ice cream or Cake?", options: ["🍦 Ice Cream", "🍰 Cake"], reaction: "Dessert decisions 😍" },
+  { text: "Rain or Sunshine?", options: ["🌧 Rain", "☀ Sunshine"], reaction: "Mood detected 🌦" },
+  { text: "Surprises or Routine?", options: ["🎁 Surprises", "🔁 Routine"], reaction: "That’s very you 💫" },
 ];
 
-/* ------------------ ROOM SHAPE (LOCKED) ------------------
-
+/* ================= ROOM SHAPE (LOCKED) =================
 {
   step: number,
   players: { [playerId]: true },
@@ -40,8 +39,7 @@ const QUESTIONS = [
   skip: boolean,
   createdAt: number
 }
-
----------------------------------------------------------- */
+======================================================== */
 
 export default function GameRoom() {
   const params = useParams();
@@ -51,7 +49,7 @@ export default function GameRoom() {
   const [loading, setLoading] = useState(true);
   const [playerId, setPlayerId] = useState<string>("");
 
-  /* ------------------ INIT PLAYER & ROOM ------------------ */
+  /* ---------- INIT PLAYER & ROOM ---------- */
 
   useEffect(() => {
     if (!roomId) return;
@@ -76,28 +74,23 @@ export default function GameRoom() {
           skip: false,
           createdAt: Date.now(),
         });
-      } else {
-        const data = snap.data();
-        if (!data.players?.[storedId!]) {
-          await updateDoc(roomRef, {
-            [`players.${storedId}`]: true,
-          });
-        }
+      } else if (!snap.data().players?.[storedId!]) {
+        await updateDoc(roomRef, {
+          [`players.${storedId}`]: true,
+        });
       }
     };
 
     initRoom();
 
-    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
-      if (!snapshot.exists()) return;
-      setRoom(snapshot.data());
+    const unsub = onSnapshot(roomRef, (snap) => {
+      if (!snap.exists()) return;
+      setRoom(snap.data());
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsub();
   }, [roomId]);
-
-  /* ------------------ LOADING ------------------ */
 
   if (loading || !room) {
     return (
@@ -111,18 +104,17 @@ export default function GameRoom() {
   }
 
   const roomRef = doc(db, "rooms", roomId);
-  const currentQuestion = QUESTIONS[room.step];
+  const question = QUESTIONS[room.step];
   const playersCount = Object.keys(room.players || {}).length;
   const answersCount = Object.keys(room.answers || {}).length;
   const hasAnswered = !!room.answers?.[playerId];
 
-  /* ------------------ ACTIONS ------------------ */
+  /* ---------- ACTIONS ---------- */
 
-  const selectAnswer = async (option: string) => {
+  const selectAnswer = async (opt: string) => {
     if (hasAnswered) return;
-
     await updateDoc(roomRef, {
-      [`answers.${playerId}`]: option,
+      [`answers.${playerId}`]: opt,
     });
   };
 
@@ -134,15 +126,15 @@ export default function GameRoom() {
     });
   };
 
-  /* ------------------ RENDER QUESTION ------------------ */
+  /* ---------- QUESTION SCREEN ---------- */
 
-  if (currentQuestion) {
+  if (question) {
     return (
       <main className="screen">
         <div className="card column">
-          <h2>{currentQuestion.text}</h2>
+          <h2>{question.text}</h2>
 
-          {currentQuestion.options.map((opt) => (
+          {question.options.map((opt) => (
             <button
               key={opt}
               className={`option-btn ${
@@ -155,28 +147,29 @@ export default function GameRoom() {
           ))}
 
           {answersCount < playersCount && (
-            <div className="waiting">
-              Waiting for other player…
-            </div>
+            <div className="waiting">Waiting for other player…</div>
           )}
 
           {answersCount === playersCount && (
-            <button className="primary-btn" onClick={goNext}>
-              Next ▶️
-            </button>
+            <>
+              <p className="floating">{question.reaction}</p>
+              <button className="primary-btn" onClick={goNext}>
+                Next ▶️
+              </button>
+            </>
           )}
         </div>
       </main>
     );
   }
 
-  /* ------------------ END PLACEHOLDER ------------------ */
+  /* ---------- PLACEHOLDER FOR MINI-GAMES ---------- */
 
   return (
     <main className="screen">
       <div className="card">
-        <h1>More fun coming next 💖</h1>
-        <p>This is just the beginning…</p>
+        <h1>Mini-games coming up 🎮</h1>
+        <p>Get ready for something fun 💖</p>
       </div>
     </main>
   );
