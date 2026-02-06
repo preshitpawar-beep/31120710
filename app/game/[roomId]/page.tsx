@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase/firebase";
@@ -33,15 +33,17 @@ export default function GameRoom() {
   const [playerId, setPlayerId] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [noPos, setNoPos] = useState({ x: 0, y: 0 });
+  const [scratchDone, setScratchDone] = useState(false);
   const [saidYes, setSaidYes] = useState(false);
   const [showCouple, setShowCouple] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
+  const [noPos, setNoPos] = useState({ x: 0, y: 0 });
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const roomRef = doc(db, "rooms", roomId);
 
   /* ---------- INIT ---------- */
-
   useEffect(() => {
     let pid = localStorage.getItem("playerId");
     if (!pid) {
@@ -72,6 +74,35 @@ export default function GameRoom() {
       setLoading(false);
     });
   }, [roomId]);
+
+  /* ---------- SCRATCH LOGIC ---------- */
+  useEffect(() => {
+    if (!canvasRef.current || scratchDone) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = 300;
+    canvas.height = 160;
+
+    ctx.fillStyle = "#ffb6c1";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "destination-out";
+
+    const scratch = (e: any) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    canvas.addEventListener("mousemove", scratch);
+    canvas.addEventListener("touchmove", scratch);
+
+    setTimeout(() => setScratchDone(true), 2500);
+  }, [scratchDone]);
 
   if (loading || !room) {
     return (
@@ -126,13 +157,20 @@ export default function GameRoom() {
         </div>
       )}
 
-      {/* FINAL VALENTINE */}
+      {/* SCRATCH + VALENTINE */}
       {room.step >= QUESTIONS.length && (
         <div className="card column center">
-          {!saidYes && (
+          {!scratchDone && (
+            <>
+              <p>Scratch to reveal 💕</p>
+              <canvas ref={canvasRef} />
+            </>
+          )}
+
+          {scratchDone && !saidYes && (
             <>
               <h1>Will you be my Valentine? 💖</h1>
-              <p style={{ opacity: 0.7 }}>Go on… try saying no 😏</p>
+              <p style={{ opacity: 0.6 }}>Try saying no 😏</p>
 
               <button
                 className="primary-btn"
@@ -149,14 +187,14 @@ export default function GameRoom() {
               <button
                 onMouseEnter={() =>
                   setNoPos({
-                    x: Math.random() * 220 - 110,
-                    y: Math.random() * 220 - 110,
+                    x: Math.random() * 200 - 100,
+                    y: Math.random() * 200 - 100,
                   })
                 }
                 onTouchStart={() =>
                   setNoPos({
-                    x: Math.random() * 220 - 110,
-                    y: Math.random() * 220 - 110,
+                    x: Math.random() * 200 - 100,
+                    y: Math.random() * 200 - 100,
                   })
                 }
                 style={{
@@ -168,235 +206,70 @@ export default function GameRoom() {
             </>
           )}
 
-          {/* STICK COUPLE */}
+          {/* STICK FIGURE SVG */}
           {showCouple && !showHeart && (
-            <div className="couple-stage">
-              <div className="stick-figure boy">
-                <div className="head" />
-                <div className="body" />
-                <div className="arm left" />
-                <div className="arm right" />
-                <div className="leg left" />
-                <div className="leg right" />
-              </div>
+            <svg width="300" height="160" className="stick-scene">
+              <g className="boy">
+                <circle cx="40" cy="30" r="10" />
+                <line x1="40" y1="40" x2="40" y2="80" />
+                <line x1="40" y1="50" x2="20" y2="65" />
+                <line x1="40" y1="50" x2="60" y2="65" />
+                <line x1="40" y1="80" x2="25" y2="110" />
+                <line x1="40" y1="80" x2="55" y2="110" />
+              </g>
 
-              <div className="stick-figure girl">
-                <div className="head" />
-                <div className="body" />
-                <div className="arm left" />
-                <div className="arm right" />
-                <div className="skirt" />
-                <div className="leg left" />
-                <div className="leg right" />
-              </div>
+              <g className="girl">
+                <circle cx="260" cy="30" r="10" />
+                <line x1="260" y1="40" x2="260" y2="80" />
+                <line x1="260" y1="50" x2="240" y2="65" />
+                <line x1="260" y1="50" x2="280" y2="65" />
+                <line x1="260" y1="80" x2="245" y2="110" />
+                <line x1="260" y1="80" x2="275" y2="110" />
+              </g>
 
-              <div className="kiss-heart">❤️</div>
-            </div>
+              <text x="150" y="50" className="kiss">❤</text>
+            </svg>
           )}
 
-          {/* HEART CELEBRATION */}
+          {/* HEART */}
           {showHeart && (
-            <div className="celebration">
-              <div className="heart-container">
-                <div className="heart left" />
-                <div className="heart right" />
-                <div className="graffiti">I KNEW IT 💖</div>
-              </div>
-
-              <p className="final">
-                Thank you for being my favourite person,
-                <br />
-                my happiest place, and my forever Valentine.
-              </p>
+            <div className="heart">
+              <h2>I KNEW IT 💖</h2>
+              <p>You are my forever Valentine.</p>
             </div>
           )}
         </div>
       )}
 
-      {/* STYLES */}
       <style jsx>{`
-        .center {
-          text-align: center;
+        svg {
+          stroke: #000;
+          stroke-width: 3;
+          fill: none;
         }
-
-        /* STICK FIGURES */
-        .couple-stage {
-          position: relative;
-          width: 100%;
-          height: 180px;
-        }
-
-        .stick-figure {
-          position: absolute;
-          width: 80px;
-          height: 140px;
-          top: 20px;
-        }
-
-        .head {
-          width: 36px;
-          height: 36px;
-          border: 4px solid #000;
-          border-radius: 50%;
-          margin: 0 auto;
-        }
-
-        .body {
-          width: 4px;
-          height: 40px;
-          background: #000;
-          margin: 0 auto;
-        }
-
-        .arm {
-          position: absolute;
-          width: 30px;
-          height: 4px;
-          background: #000;
-          top: 55px;
-        }
-
-        .arm.left {
-          left: 0;
-          transform: rotate(25deg);
-        }
-
-        .arm.right {
-          right: 0;
-          transform: rotate(-25deg);
-        }
-
-        .leg {
-          position: absolute;
-          width: 30px;
-          height: 4px;
-          background: #000;
-          bottom: 0;
-        }
-
-        .leg.left {
-          left: 12px;
-          transform: rotate(25deg);
-        }
-
-        .leg.right {
-          right: 12px;
-          transform: rotate(-25deg);
-        }
-
-        .girl .skirt {
-          width: 40px;
-          height: 20px;
-          border: 4px solid #000;
-          border-top: none;
-          margin: 0 auto;
-        }
-
         .boy {
-          left: -100px;
-          animation: boyWalk 3s forwards;
+          animation: walkLeft 3s forwards;
         }
-
         .girl {
-          right: -100px;
-          animation: girlWalk 3s forwards;
+          animation: walkRight 3s forwards;
         }
-
-        .kiss-heart {
-          position: absolute;
-          left: 50%;
-          top: 45px;
-          transform: translateX(-50%);
-          font-size: 28px;
+        .kiss {
           opacity: 0;
           animation: kiss 1s ease 3s forwards;
+          fill: red;
+          font-size: 20px;
         }
-
-        /* HEART */
-        .heart-container {
-          position: relative;
-          width: 140px;
-          height: 120px;
-          margin: 10px auto;
-        }
-
-        .heart {
-          position: absolute;
-          width: 70px;
-          height: 110px;
-          background: #ff4f8b;
-          border-radius: 50px 50px 0 0;
-        }
-
-        .heart.left {
-          left: 0;
-          transform: rotate(-45deg);
-          animation: openLeft 0.8s forwards;
-        }
-
-        .heart.right {
-          right: 0;
-          transform: rotate(45deg);
-          animation: openRight 0.8s forwards;
-        }
-
-        .graffiti {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.6rem;
-          font-weight: 800;
-          opacity: 0;
-          animation: pop 0.6s ease 0.8s forwards;
-        }
-
-        .final {
-          margin-top: 12px;
-          opacity: 0;
-          animation: fadeIn 1s ease 1.2s forwards;
-        }
-
-        @keyframes boyWalk {
+        @keyframes walkLeft {
           to {
-            left: calc(50% - 90px);
+            transform: translateX(80px);
           }
         }
-
-        @keyframes girlWalk {
+        @keyframes walkRight {
           to {
-            right: calc(50% - 90px);
+            transform: translateX(-80px);
           }
         }
-
         @keyframes kiss {
-          to {
-            opacity: 1;
-            transform: translateX(-50%) scale(1.2);
-          }
-        }
-
-        @keyframes openLeft {
-          to {
-            transform: translateX(-60px) rotate(-45deg);
-          }
-        }
-
-        @keyframes openRight {
-          to {
-            transform: translateX(60px) rotate(45deg);
-          }
-        }
-
-        @keyframes pop {
-          to {
-            opacity: 1;
-            transform: scale(1.2);
-          }
-        }
-
-        @keyframes fadeIn {
           to {
             opacity: 1;
           }
