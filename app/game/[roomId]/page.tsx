@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/firebase/firebase";
 
 /* ================= QUESTIONS ================= */
@@ -23,7 +29,6 @@ const QUESTIONS = [
   { q: "Rain or Sunshine?", o: ["🌧 Rain", "☀ Sunshine"] },
   { q: "Surprises or Routine?", o: ["🎁 Surprises", "🔁 Routine"] },
 ];
-
 /* ================= GAME ================= */
 
 export default function GameRoom() {
@@ -40,7 +45,6 @@ export default function GameRoom() {
   const [noPos, setNoPos] = useState({ x: 0, y: 0 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
   const roomRef = doc(db, "rooms", roomId);
 
   /* ---------- INIT ---------- */
@@ -75,33 +79,73 @@ export default function GameRoom() {
     });
   }, [roomId]);
 
-  /* ---------- SCRATCH LOGIC ---------- */
+  /* ---------- SCRATCH LOGIC (FIXED) ---------- */
   useEffect(() => {
     if (!canvasRef.current || scratchDone) return;
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = 300;
-    canvas.height = 160;
+    const width = 300;
+    const height = 160;
 
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#ffb6c1";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
     ctx.globalCompositeOperation = "destination-out";
 
-    const scratch = (e: any) => {
+    let isDrawing = false;
+    let scratched = 0;
+    const revealThreshold = width * height * 0.35;
+
+    const getPos = (e: any) => {
       const rect = canvas.getBoundingClientRect();
-      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-      ctx.beginPath();
-      ctx.arc(x, y, 20, 0, Math.PI * 2);
-      ctx.fill();
+      const x =
+        (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y =
+        (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      return { x, y };
     };
 
-    canvas.addEventListener("mousemove", scratch);
-    canvas.addEventListener("touchmove", scratch);
+    const scratch = (e: any) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const { x, y } = getPos(e);
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.fill();
+      scratched += Math.PI * 18 * 18;
+      if (scratched > revealThreshold) setScratchDone(true);
+    };
 
-    setTimeout(() => setScratchDone(true), 2500);
+    const start = (e: any) => {
+      isDrawing = true;
+      scratch(e);
+    };
+    const end = () => (isDrawing = false);
+
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mousemove", scratch);
+    canvas.addEventListener("mouseup", end);
+    canvas.addEventListener("mouseleave", end);
+
+    canvas.addEventListener("touchstart", start, { passive: false });
+    canvas.addEventListener("touchmove", scratch, { passive: false });
+    canvas.addEventListener("touchend", end);
+
+    return () => {
+      canvas.removeEventListener("mousedown", start);
+      canvas.removeEventListener("mousemove", scratch);
+      canvas.removeEventListener("mouseup", end);
+      canvas.removeEventListener("mouseleave", end);
+      canvas.removeEventListener("touchstart", start);
+      canvas.removeEventListener("touchmove", scratch);
+      canvas.removeEventListener("touchend", end);
+    };
   }, [scratchDone]);
 
   if (loading || !room) {
@@ -163,7 +207,15 @@ export default function GameRoom() {
           {!scratchDone && (
             <>
               <p>Scratch to reveal 💕</p>
-              <canvas ref={canvasRef} />
+              <canvas
+                ref={canvasRef}
+                style={{
+                  width: "300px",
+                  height: "160px",
+                  borderRadius: "16px",
+                  touchAction: "none",
+                }}
+              />
             </>
           )}
 
@@ -197,18 +249,16 @@ export default function GameRoom() {
                     y: Math.random() * 200 - 100,
                   })
                 }
-                style={{
-                  transform: `translate(${noPos.x}px, ${noPos.y}px)`,
-                }}
+                style={{ transform: `translate(${noPos.x}px, ${noPos.y}px)` }}
               >
                 NO 🙃
               </button>
             </>
           )}
 
-          {/* STICK FIGURE SVG */}
+          {/* STICK FIGURES */}
           {showCouple && !showHeart && (
-            <svg width="300" height="160" className="stick-scene">
+            <svg width="300" height="160" className="stick">
               <g className="boy">
                 <circle cx="40" cy="30" r="10" />
                 <line x1="40" y1="40" x2="40" y2="80" />
@@ -227,7 +277,7 @@ export default function GameRoom() {
                 <line x1="260" y1="80" x2="275" y2="110" />
               </g>
 
-              <text x="150" y="50" className="kiss">❤</text>
+              <text x="150" y="50" className="kiss">❤️</text>
             </svg>
           )}
 
@@ -260,19 +310,13 @@ export default function GameRoom() {
           font-size: 20px;
         }
         @keyframes walkLeft {
-          to {
-            transform: translateX(80px);
-          }
+          to { transform: translateX(80px); }
         }
         @keyframes walkRight {
-          to {
-            transform: translateX(-80px);
-          }
+          to { transform: translateX(-80px); }
         }
         @keyframes kiss {
-          to {
-            opacity: 1;
-          }
+          to { opacity: 1; }
         }
       `}</style>
     </main>
