@@ -136,7 +136,7 @@ export default function GameRoom() {
       )}
 
       {/* FINAL VALENTINE */}
-      {room.step === TOTAL_STEPS - 1 && (
+      {room.step === QUESTIONS.length && (
         <div className="card column center">
           {!scratchDone && (
             <>
