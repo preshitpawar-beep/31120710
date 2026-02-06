@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import {
-  doc,
-  onSnapshot,
-  setDoc,
-  updateDoc,
-  getDoc,
-} from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase/firebase";
 
 /* ================= QUESTIONS ================= */
@@ -30,6 +24,8 @@ const QUESTIONS = [
   { q: "Surprises or Routine?", o: ["🎁 Surprises", "🔁 Routine"] },
 ];
 
+/* ================= GAME ================= */
+
 export default function GameRoom() {
   const { roomId } = useParams() as { roomId: string };
 
@@ -45,6 +41,7 @@ export default function GameRoom() {
   const roomRef = doc(db, "rooms", roomId);
 
   /* ---------- INIT ---------- */
+
   useEffect(() => {
     let pid = localStorage.getItem("playerId");
     if (!pid) {
@@ -70,12 +67,10 @@ export default function GameRoom() {
 
     init();
 
-    const unsub = onSnapshot(roomRef, (s) => {
+    return onSnapshot(roomRef, (s) => {
       setRoom(s.data());
       setLoading(false);
     });
-
-    return () => unsub();
   }, [roomId]);
 
   if (loading || !room) {
@@ -97,6 +92,8 @@ export default function GameRoom() {
       answers: {},
     });
   };
+
+  /* ================= UI ================= */
 
   return (
     <main className="screen">
@@ -143,7 +140,7 @@ export default function GameRoom() {
                   navigator.vibrate?.([120, 60, 120]);
                   setSaidYes(true);
                   setShowCouple(true);
-                  setTimeout(() => setShowHeart(true), 6000);
+                  setTimeout(() => setShowHeart(true), 5000);
                 }}
               >
                 YES 💕
@@ -171,7 +168,7 @@ export default function GameRoom() {
             </>
           )}
 
-          {/* COUPLE */}
+          {/* STICK COUPLE */}
           {showCouple && !showHeart && (
             <div className="couple-stage">
               <div className="stick-figure boy">
@@ -197,7 +194,7 @@ export default function GameRoom() {
             </div>
           )}
 
-          {/* CELEBRATION */}
+          {/* HEART CELEBRATION */}
           {showHeart && (
             <div className="celebration">
               <div className="heart-container">
@@ -218,8 +215,192 @@ export default function GameRoom() {
 
       {/* STYLES */}
       <style jsx>{`
-        /* ALL YOUR STYLES — UNCHANGED */
-        /* (exact same CSS you wrote, now correctly placed) */
+        .center {
+          text-align: center;
+        }
+
+        /* STICK FIGURES */
+        .couple-stage {
+          position: relative;
+          width: 100%;
+          height: 180px;
+        }
+
+        .stick-figure {
+          position: absolute;
+          width: 80px;
+          height: 140px;
+          top: 20px;
+        }
+
+        .head {
+          width: 36px;
+          height: 36px;
+          border: 4px solid #000;
+          border-radius: 50%;
+          margin: 0 auto;
+        }
+
+        .body {
+          width: 4px;
+          height: 40px;
+          background: #000;
+          margin: 0 auto;
+        }
+
+        .arm {
+          position: absolute;
+          width: 30px;
+          height: 4px;
+          background: #000;
+          top: 55px;
+        }
+
+        .arm.left {
+          left: 0;
+          transform: rotate(25deg);
+        }
+
+        .arm.right {
+          right: 0;
+          transform: rotate(-25deg);
+        }
+
+        .leg {
+          position: absolute;
+          width: 30px;
+          height: 4px;
+          background: #000;
+          bottom: 0;
+        }
+
+        .leg.left {
+          left: 12px;
+          transform: rotate(25deg);
+        }
+
+        .leg.right {
+          right: 12px;
+          transform: rotate(-25deg);
+        }
+
+        .girl .skirt {
+          width: 40px;
+          height: 20px;
+          border: 4px solid #000;
+          border-top: none;
+          margin: 0 auto;
+        }
+
+        .boy {
+          left: -100px;
+          animation: boyWalk 3s forwards;
+        }
+
+        .girl {
+          right: -100px;
+          animation: girlWalk 3s forwards;
+        }
+
+        .kiss-heart {
+          position: absolute;
+          left: 50%;
+          top: 45px;
+          transform: translateX(-50%);
+          font-size: 28px;
+          opacity: 0;
+          animation: kiss 1s ease 3s forwards;
+        }
+
+        /* HEART */
+        .heart-container {
+          position: relative;
+          width: 140px;
+          height: 120px;
+          margin: 10px auto;
+        }
+
+        .heart {
+          position: absolute;
+          width: 70px;
+          height: 110px;
+          background: #ff4f8b;
+          border-radius: 50px 50px 0 0;
+        }
+
+        .heart.left {
+          left: 0;
+          transform: rotate(-45deg);
+          animation: openLeft 0.8s forwards;
+        }
+
+        .heart.right {
+          right: 0;
+          transform: rotate(45deg);
+          animation: openRight 0.8s forwards;
+        }
+
+        .graffiti {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.6rem;
+          font-weight: 800;
+          opacity: 0;
+          animation: pop 0.6s ease 0.8s forwards;
+        }
+
+        .final {
+          margin-top: 12px;
+          opacity: 0;
+          animation: fadeIn 1s ease 1.2s forwards;
+        }
+
+        @keyframes boyWalk {
+          to {
+            left: calc(50% - 90px);
+          }
+        }
+
+        @keyframes girlWalk {
+          to {
+            right: calc(50% - 90px);
+          }
+        }
+
+        @keyframes kiss {
+          to {
+            opacity: 1;
+            transform: translateX(-50%) scale(1.2);
+          }
+        }
+
+        @keyframes openLeft {
+          to {
+            transform: translateX(-60px) rotate(-45deg);
+          }
+        }
+
+        @keyframes openRight {
+          to {
+            transform: translateX(60px) rotate(45deg);
+          }
+        }
+
+        @keyframes pop {
+          to {
+            opacity: 1;
+            transform: scale(1.2);
+          }
+        }
+
+        @keyframes fadeIn {
+          to {
+            opacity: 1;
+          }
+        }
       `}</style>
     </main>
   );
