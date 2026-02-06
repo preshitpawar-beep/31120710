@@ -44,11 +44,11 @@ export default function GameRoom() {
 
   const [tapCount, setTapCount] = useState(0);
   const [noPos, setNoPos] = useState({ x: 0, y: 0 });
-  const [saidYes, setSaidYes] = useState(false);
 
-  // Scratch states
-  const [scratchReady, setScratchReady] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Final sequence states
+  const [scratchDone, setScratchDone] = useState(false);
+  const [saidYes, setSaidYes] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
 
   const roomRef = doc(db, "rooms", roomId);
 
@@ -87,56 +87,10 @@ export default function GameRoom() {
     });
   }, [roomId]);
 
-  /* ---------- SCRATCH SETUP ---------- */
-
-  useEffect(() => {
-    if (!scratchReady || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d")!;
-    const rect = canvas.getBoundingClientRect();
-
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    ctx.fillStyle = "#ffd6e7";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = "destination-out";
-
-    const scratch = (x: number, y: number) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 26, 0, Math.PI * 2);
-      ctx.fill();
-    };
-
-    let active = false;
-
-    const start = () => (active = true);
-    const end = () => (active = false);
-    const move = (e: any) => {
-      if (!active) return;
-      const p = e.touches ? e.touches[0] : e;
-      scratch(p.clientX - rect.left, p.clientY - rect.top);
-    };
-
-    canvas.addEventListener("mousedown", start);
-    canvas.addEventListener("mouseup", end);
-    canvas.addEventListener("mousemove", move);
-    canvas.addEventListener("touchstart", start);
-    canvas.addEventListener("touchend", end);
-    canvas.addEventListener("touchmove", move);
-
-    return () => {
-      canvas.replaceWith(canvas.cloneNode(true));
-    };
-  }, [scratchReady]);
-
   if (loading || !room) {
     return (
       <main className="screen">
-        <div className="card">
-          <h2>Joining room…</h2>
-        </div>
+        <div className="card"><h2>Joining…</h2></div>
       </main>
     );
   }
@@ -153,6 +107,8 @@ export default function GameRoom() {
       skip: false,
     });
   };
+
+  /* ===================== UI ===================== */
 
   return (
     <main className="screen">
@@ -174,70 +130,24 @@ export default function GameRoom() {
               {opt}
             </button>
           ))}
-          {!allAnswered && <p className="waiting">Waiting for other player…</p>}
+          {!allAnswered && <p className="waiting">Waiting…</p>}
           {allAnswered && <button className="primary-btn" onClick={next}>Next ▶️</button>}
         </div>
       )}
 
-      {/* MINI GAMES (unchanged logic) */}
-      {room.step === QUESTIONS.length && (
-        <div className="card column">
-          <h2>Pick the same side 💕</h2>
-          {["⬅ LEFT", "RIGHT ➡"].map((o) => (
-            <button key={o} className="option-btn"
-              onClick={() => !answered && updateDoc(roomRef, { [`answers.${playerId}`]: o })}>
-              {o}
-            </button>
-          ))}
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
-        </div>
-      )}
-
-      {room.step === QUESTIONS.length + 1 && (
-        <div className="card column">
-          <h2>Tap like crazy 💥</h2>
-          <button className="primary-btn" onClick={() => {
-            setTapCount(tapCount + 1);
-            updateDoc(roomRef, { [`answers.${playerId}`]: tapCount + 1 });
-          }}>
-            TAP
-          </button>
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
-        </div>
-      )}
-
-      {room.step === QUESTIONS.length + 2 && (
-        <div className="card column">
-          <h2>How much do you like surprises?</h2>
-          <input type="range" min="0" max="100"
-            onChange={(e) =>
-              updateDoc(roomRef, { [`answers.${playerId}`]: e.target.value })
-            }
-          />
-          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
-        </div>
-      )}
-
-      {/* FINAL SCRATCH + VALENTINE */}
+      {/* FINAL VALENTINE */}
       {room.step === TOTAL_STEPS - 1 && (
-        <div className="card column">
-          {!scratchReady && (
+        <div className="card column center">
+          {!scratchDone && (
             <>
               <h2>Scratch to reveal 💕</h2>
-              <div style={{ position: "relative", height: 160 }}>
-                <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: 20 }} />
-                <button
-                  className="primary-btn"
-                  style={{ position: "absolute", inset: 0 }}
-                  onClick={() => setScratchReady(true)}
-                >
-                  ✨ Scratch Me ✨
-                </button>
-              </div>
+              <button className="primary-btn" onClick={() => setScratchDone(true)}>
+                ✨ Scratch Me ✨
+              </button>
             </>
           )}
 
-          {scratchReady && !saidYes && (
+          {scratchDone && !saidYes && (
             <>
               <h1 className="floating">Will you be my Valentine? 💖</h1>
               <p style={{ opacity: 0.7 }}>Go on… try saying no 😏</p>
@@ -247,36 +157,128 @@ export default function GameRoom() {
                 onClick={() => {
                   navigator.vibrate?.([120, 60, 120]);
                   setSaidYes(true);
+                  setTimeout(() => setCelebrate(true), 600);
                 }}
               >
                 YES 💕
               </button>
 
               <button
-                style={{ transform: `translate(${noPos.x}px, ${noPos.y}px)` }}
                 onMouseEnter={() =>
                   setNoPos({
                     x: Math.random() * 140 - 70,
                     y: Math.random() * 140 - 70,
                   })
                 }
+                style={{ transform: `translate(${noPos.x}px, ${noPos.y}px)` }}
               >
                 NO 🙃
               </button>
             </>
           )}
 
-          {saidYes && (
-            <>
-              <h1 className="floating">💖 I KNEW IT 💖</h1>
-              <p className="floating">
+          {/* 💘 CELEBRATION */}
+          {celebrate && (
+            <div className="celebration">
+              <div className="heart-container">
+                <div className="heart left" />
+                <div className="heart right" />
+                <div className="graffiti">I KNEW IT 💖</div>
+              </div>
+
+              <div className="heart-burst">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <span key={i}>💘</span>
+                ))}
+              </div>
+
+              <p className="final-text">
                 Thank you for being my favourite person,
-                <br /> my happiest place, and my forever Valentine.
+                <br />
+                my happiest place, and my forever Valentine.
               </p>
-            </>
+            </div>
           )}
         </div>
       )}
+
+      {/* ===== CELEBRATION STYLES ===== */}
+      <style jsx>{`
+        .celebration {
+          position: relative;
+          text-align: center;
+          animation: fadeIn 0.6s ease;
+        }
+
+        .heart-container {
+          position: relative;
+          width: 140px;
+          height: 120px;
+          margin: 20px auto;
+        }
+
+        .heart {
+          position: absolute;
+          width: 70px;
+          height: 110px;
+          background: #ff4f8b;
+          border-radius: 50px 50px 0 0;
+          top: 0;
+        }
+
+        .heart.left {
+          left: 0;
+          transform: rotate(-45deg);
+          animation: openLeft 0.8s ease forwards;
+        }
+
+        .heart.right {
+          right: 0;
+          transform: rotate(45deg);
+          animation: openRight 0.8s ease forwards;
+        }
+
+        .graffiti {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.6rem;
+          font-weight: 800;
+          color: #ff2d7a;
+          animation: pop 0.6s ease 0.8s forwards;
+          opacity: 0;
+        }
+
+        .heart-burst span {
+          position: absolute;
+          animation: burst 1.2s ease forwards;
+        }
+
+        .final-text {
+          margin-top: 20px;
+          animation: fadeIn 1s ease 1.2s forwards;
+          opacity: 0;
+        }
+
+        @keyframes openLeft {
+          to { transform: translateX(-60px) rotate(-45deg); }
+        }
+        @keyframes openRight {
+          to { transform: translateX(60px) rotate(45deg); }
+        }
+        @keyframes pop {
+          to { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes burst {
+          from { transform: scale(0); }
+          to { transform: translateY(-120px) scale(1); }
+        }
+        @keyframes fadeIn {
+          to { opacity: 1; }
+        }
+      `}</style>
     </main>
   );
 }
