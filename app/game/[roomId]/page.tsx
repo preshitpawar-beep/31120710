@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   doc,
@@ -38,13 +38,14 @@ export default function GameRoom() {
   const [playerId, setPlayerId] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [scratchDone, setScratchDone] = useState(false);
+  const [revealText, setRevealText] = useState("");
+  const [revealed, setRevealed] = useState(false);
+
   const [saidYes, setSaidYes] = useState(false);
   const [showCouple, setShowCouple] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
   const [noPos, setNoPos] = useState({ x: 0, y: 0 });
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const roomRef = doc(db, "rooms", roomId);
 
   /* ---------- INIT ---------- */
@@ -78,75 +79,6 @@ export default function GameRoom() {
       setLoading(false);
     });
   }, [roomId]);
-
-  /* ---------- SCRATCH LOGIC (FIXED) ---------- */
-  useEffect(() => {
-    if (!canvasRef.current || scratchDone) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = 300;
-    const height = 160;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#ffb6c1";
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = "destination-out";
-
-    let isDrawing = false;
-    let scratched = 0;
-    const revealThreshold = width * height * 0.35;
-
-    const getPos = (e: any) => {
-      const rect = canvas.getBoundingClientRect();
-      const x =
-        (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      const y =
-        (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-      return { x, y };
-    };
-
-    const scratch = (e: any) => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const { x, y } = getPos(e);
-      ctx.beginPath();
-      ctx.arc(x, y, 18, 0, Math.PI * 2);
-      ctx.fill();
-      scratched += Math.PI * 18 * 18;
-      if (scratched > revealThreshold) setScratchDone(true);
-    };
-
-    const start = (e: any) => {
-      isDrawing = true;
-      scratch(e);
-    };
-    const end = () => (isDrawing = false);
-
-    canvas.addEventListener("mousedown", start);
-    canvas.addEventListener("mousemove", scratch);
-    canvas.addEventListener("mouseup", end);
-    canvas.addEventListener("mouseleave", end);
-
-    canvas.addEventListener("touchstart", start, { passive: false });
-    canvas.addEventListener("touchmove", scratch, { passive: false });
-    canvas.addEventListener("touchend", end);
-
-    return () => {
-      canvas.removeEventListener("mousedown", start);
-      canvas.removeEventListener("mousemove", scratch);
-      canvas.removeEventListener("mouseup", end);
-      canvas.removeEventListener("mouseleave", end);
-      canvas.removeEventListener("touchstart", start);
-      canvas.removeEventListener("touchmove", scratch);
-      canvas.removeEventListener("touchend", end);
-    };
-  }, [scratchDone]);
 
   if (loading || !room) {
     return (
@@ -201,25 +133,27 @@ export default function GameRoom() {
         </div>
       )}
 
-      {/* SCRATCH + VALENTINE */}
+      {/* TYPE TO REVEAL */}
       {room.step >= QUESTIONS.length && (
         <div className="card column center">
-          {!scratchDone && (
+          {!revealed && (
             <>
-              <p>Scratch to reveal 💕</p>
-              <canvas
-                ref={canvasRef}
-                style={{
-                  width: "300px",
-                  height: "160px",
-                  borderRadius: "16px",
-                  touchAction: "none",
+              <h2>Type <span style={{ color: "#ff4f8b" }}>LOVE</span> to reveal 💕</h2>
+              <input
+                value={revealText}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setRevealText(val);
+                  if (val === "LOVE") setRevealed(true);
                 }}
+                placeholder="Type here…"
+                className="love-input"
               />
             </>
           )}
 
-          {scratchDone && !saidYes && (
+          {/* VALENTINE */}
+          {revealed && !saidYes && (
             <>
               <h1>Will you be my Valentine? 💖</h1>
               <p style={{ opacity: 0.6 }}>Try saying no 😏</p>
@@ -258,7 +192,7 @@ export default function GameRoom() {
 
           {/* STICK FIGURES */}
           {showCouple && !showHeart && (
-            <svg width="300" height="160" className="stick">
+            <svg width="300" height="160">
               <g className="boy">
                 <circle cx="40" cy="30" r="10" />
                 <line x1="40" y1="40" x2="40" y2="80" />
@@ -308,6 +242,14 @@ export default function GameRoom() {
           animation: kiss 1s ease 3s forwards;
           fill: red;
           font-size: 20px;
+        }
+        .love-input {
+          padding: 12px;
+          font-size: 1.2rem;
+          border-radius: 12px;
+          border: 2px solid #ff4f8b;
+          text-align: center;
+          margin-top: 10px;
         }
         @keyframes walkLeft {
           to { transform: translateX(80px); }
