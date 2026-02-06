@@ -219,7 +219,7 @@ export default function GameRoom() {
           {showHeart && (
             <div className="heart">
               <h2>I KNEW IT 💖</h2>
-              <p>Thank you for choosing me, for staying, and for being my favourite person in every version of life. You are my forever Valentine.</p>
+              <p>You are my forever Valentine. 😘 </p>
             </div>
           )}
         </div>
