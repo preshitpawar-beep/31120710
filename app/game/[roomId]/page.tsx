@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   doc,
@@ -31,7 +31,7 @@ const QUESTIONS = [
   { q: "Surprises or Routine?", o: ["🎁 Surprises", "🔁 Routine"] },
 ];
 
-const TOTAL_STEPS = QUESTIONS.length + 3 + 1; // questions + 3 mini-games + final
+const TOTAL_STEPS = QUESTIONS.length + 3 + 1;
 
 /* ===================== GAME ===================== */
 
@@ -41,9 +41,14 @@ export default function GameRoom() {
   const [room, setRoom] = useState<any>(null);
   const [playerId, setPlayerId] = useState("");
   const [loading, setLoading] = useState(true);
+
   const [tapCount, setTapCount] = useState(0);
   const [noPos, setNoPos] = useState({ x: 0, y: 0 });
   const [saidYes, setSaidYes] = useState(false);
+
+  // Scratch states
+  const [scratchReady, setScratchReady] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const roomRef = doc(db, "rooms", roomId);
 
@@ -82,6 +87,50 @@ export default function GameRoom() {
     });
   }, [roomId]);
 
+  /* ---------- SCRATCH SETUP ---------- */
+
+  useEffect(() => {
+    if (!scratchReady || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const rect = canvas.getBoundingClientRect();
+
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    ctx.fillStyle = "#ffd6e7";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "destination-out";
+
+    const scratch = (x: number, y: number) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 26, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    let active = false;
+
+    const start = () => (active = true);
+    const end = () => (active = false);
+    const move = (e: any) => {
+      if (!active) return;
+      const p = e.touches ? e.touches[0] : e;
+      scratch(p.clientX - rect.left, p.clientY - rect.top);
+    };
+
+    canvas.addEventListener("mousedown", start);
+    canvas.addEventListener("mouseup", end);
+    canvas.addEventListener("mousemove", move);
+    canvas.addEventListener("touchstart", start);
+    canvas.addEventListener("touchend", end);
+    canvas.addEventListener("touchmove", move);
+
+    return () => {
+      canvas.replaceWith(canvas.cloneNode(true));
+    };
+  }, [scratchReady]);
+
   if (loading || !room) {
     return (
       <main className="screen">
@@ -105,29 +154,18 @@ export default function GameRoom() {
     });
   };
 
-  const skip = async () => {
-    await next();
-  };
-
-  /* ===================== UI ===================== */
-
   return (
     <main className="screen">
-      <button className="skip-btn" onClick={skip}>
-        Skip ⏭
-      </button>
+      <button className="skip-btn" onClick={next}>Skip ⏭</button>
 
       {/* QUESTIONS */}
       {room.step < QUESTIONS.length && (
         <div className="card column">
           <h2>{QUESTIONS[room.step].q}</h2>
-
           {QUESTIONS[room.step].o.map((opt) => (
             <button
               key={opt}
-              className={`option-btn ${
-                answers[playerId] === opt ? "selected" : ""
-              }`}
+              className={`option-btn ${answers[playerId] === opt ? "selected" : ""}`}
               onClick={() =>
                 !answered &&
                 updateDoc(roomRef, { [`answers.${playerId}`]: opt })
@@ -136,131 +174,104 @@ export default function GameRoom() {
               {opt}
             </button>
           ))}
-
-          {!allAnswered && (
-            <p className="waiting">Waiting for other player…</p>
-          )}
-
-          {allAnswered && (
-            <button className="primary-btn" onClick={next}>
-              Next ▶️
-            </button>
-          )}
+          {!allAnswered && <p className="waiting">Waiting for other player…</p>}
+          {allAnswered && <button className="primary-btn" onClick={next}>Next ▶️</button>}
         </div>
       )}
 
-      {/* MINI GAME 1 */}
+      {/* MINI GAMES (unchanged logic) */}
       {room.step === QUESTIONS.length && (
         <div className="card column">
           <h2>Pick the same side 💕</h2>
           {["⬅ LEFT", "RIGHT ➡"].map((o) => (
-            <button
-              key={o}
-              className="option-btn"
-              onClick={() =>
-                !answered &&
-                updateDoc(roomRef, { [`answers.${playerId}`]: o })
-              }
-            >
+            <button key={o} className="option-btn"
+              onClick={() => !answered && updateDoc(roomRef, { [`answers.${playerId}`]: o })}>
               {o}
             </button>
           ))}
-          {allAnswered && (
-            <button className="primary-btn" onClick={next}>
-              Continue ▶️
-            </button>
-          )}
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
         </div>
       )}
 
-      {/* MINI GAME 2 */}
       {room.step === QUESTIONS.length + 1 && (
         <div className="card column">
-          <h2>Tap as much as you want 💥</h2>
-          <button
-            className="primary-btn"
-            onClick={() => {
-              setTapCount(tapCount + 1);
-              updateDoc(roomRef, {
-                [`answers.${playerId}`]: tapCount + 1,
-              });
-            }}
-          >
+          <h2>Tap like crazy 💥</h2>
+          <button className="primary-btn" onClick={() => {
+            setTapCount(tapCount + 1);
+            updateDoc(roomRef, { [`answers.${playerId}`]: tapCount + 1 });
+          }}>
             TAP
           </button>
-          {allAnswered && (
-            <button className="primary-btn" onClick={next}>
-              Continue ▶️
-            </button>
-          )}
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
         </div>
       )}
 
-      {/* MINI GAME 3 */}
       {room.step === QUESTIONS.length + 2 && (
         <div className="card column">
           <h2>How much do you like surprises?</h2>
-          <input
-            type="range"
-            min="0"
-            max="100"
+          <input type="range" min="0" max="100"
             onChange={(e) =>
-              updateDoc(roomRef, {
-                [`answers.${playerId}`]: e.target.value,
-              })
+              updateDoc(roomRef, { [`answers.${playerId}`]: e.target.value })
             }
           />
-          {allAnswered && (
-            <button className="primary-btn" onClick={next}>
-              Continue ▶️
-            </button>
-          )}
+          {allAnswered && <button className="primary-btn" onClick={next}>Continue ▶️</button>}
         </div>
       )}
 
-      {/* FINAL */}
+      {/* FINAL SCRATCH + VALENTINE */}
       {room.step === TOTAL_STEPS - 1 && (
         <div className="card column">
-          {!saidYes ? (
+          {!scratchReady && (
             <>
-              <h2>One last question…</h2>
-              <h1>Will you be my Valentine? 💖</h1>
+              <h2>Scratch to reveal 💕</h2>
+              <div style={{ position: "relative", height: 160 }}>
+                <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: 20 }} />
+                <button
+                  className="primary-btn"
+                  style={{ position: "absolute", inset: 0 }}
+                  onClick={() => setScratchReady(true)}
+                >
+                  ✨ Scratch Me ✨
+                </button>
+              </div>
+            </>
+          )}
+
+          {scratchReady && !saidYes && (
+            <>
+              <h1 className="floating">Will you be my Valentine? 💖</h1>
+              <p style={{ opacity: 0.7 }}>Go on… try saying no 😏</p>
 
               <button
                 className="primary-btn floating"
-                  onClick={() => {
-                  // 📳 Phone vibration (sweet pulse)
-                  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-                  navigator.vibrate([100, 50, 100]);
-                 }
-                 setSaidYes(true);
-               }}
+                onClick={() => {
+                  navigator.vibrate?.([120, 60, 120]);
+                  setSaidYes(true);
+                }}
               >
                 YES 💕
               </button>
 
               <button
-                style={{
-                  transform: `translate(${noPos.x}px, ${noPos.y}px)`,
-                  background: "#eee",
-                }}
+                style={{ transform: `translate(${noPos.x}px, ${noPos.y}px)` }}
                 onMouseEnter={() =>
                   setNoPos({
-                    x: Math.random() * 120 - 60,
-                    y: Math.random() * 120 - 60,
+                    x: Math.random() * 140 - 70,
+                    y: Math.random() * 140 - 70,
                   })
                 }
               >
                 NO 🙃
               </button>
             </>
-          ) : (
+          )}
+
+          {saidYes && (
             <>
-              <h1 className="floating">💖 I knew you’d say yes 💖</h1>
+              <h1 className="floating">💖 I KNEW IT 💖</h1>
               <p className="floating">
                 Thank you for being my favourite person,
-                <br />
-                my happiest place, and my forever Valentine.
+                <br /> my happiest place, and my forever Valentine.
               </p>
             </>
           )}
